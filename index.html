@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <!-- MindAR per A-Frame -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      /* Il video generato da MindAR NON deve essere hidden con display:none, altrimenti non aggiorna la texture.
+         Lo riduciamo a dimensioni minime e lo rendiamo quasi invisibile. */
+      a-scene video {
+        opacity: 0.001;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+      }
+      /* Pulsante per lo screenshot */
+      #capture {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 80px;
+        background: #FD0BF8;
+        background-image: url('foto-unito.png');
+        background-size: cover;
+        background-position: center;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        z-index: 1000;
+      }
+      #capture:active {
+        transform: translateX(-50%) scale(0.9);
+      }
+      /* Indicatore di registrazione (se usi anche la registrazione video) */
+      #recordingIndicator {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(255,0,0,0.8);
+        color: white;
+        padding: 10px;
+        font-size: 16px;
+        border-radius: 10px;
+        display: none;
+        z-index: 1001;
+      }
+    </style>
+  </head>
+  <body>
+    <a-scene 
+      mindar-image="imageTargetSrc: marker.mind; stabilizationThreshold: 0.02;" 
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights, preserveDrawingBuffer: true, alpha: true"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      screenshot>
+      
+      <a-assets>
+        <!-- Il modello 3D (le ali) -->
+        <a-asset-item id="avatarModel" src="modello.glb"></a-asset-item>
+      </a-assets>
+
+      <a-light type="ambient" intensity="1"></a-light>
+      <a-camera id="camera" position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <!-- 
+        Piano di background che copre l’area visibile. 
+        Usando il video come texture (id "videoFeed") integriamo il feed della camera nel canvas.
+        Le dimensioni qui sono impostate per un aspect ratio 16:9; adatta se necessario.
+      -->
+      <a-plane id="videoPlane" position="0 0 -1" rotation="0 0 0"
+               width="16" height="9"
+               material="shader: flat; src: #videoFeed">
+      </a-plane>
+
+      <!-- Overlay 3D: l’asset (le ali) collegato a uno dei target.
+           Se hai più target, aggiungi le relative entità come nel tuo codice originale. -->
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-gltf-model src="#avatarModel" 
+                      position="0 0.4 0.1" 
+                      scale="0.01 0.01 0.01" 
+                      rotation="0 180 0">
+        </a-gltf-model>
+      </a-entity>
+      <!-- Altri target (1-11) se necessario... -->
+    </a-scene>
+
+    <div id="recordingIndicator">Registrazione in corso...</div>
+    <button id="capture"></button>
+
+    <script>
+      const captureButton = document.getElementById('capture');
+      const recordingIndicator = document.getElementById('recordingIndicator');
+      const scene = document.querySelector('a-scene');
+
+      // Al renderstart, cerchiamo il video creato da MindAR e assegniamogli l'id "videoFeed"
+      scene.addEventListener('renderstart', () => {
+        const video = document.querySelector('video');
+        if (video) {
+          video.crossOrigin = "anonymous"; // per evitare problemi CORS
+          video.id = 'videoFeed';
+        }
+      });
+
+      // Funzione screenshot: usa il componente screenshot di A-Frame per catturare il canvas WebGL
+      function takeScreenshot() {
+        const screenshotComponent = scene.components.screenshot;
+        if (screenshotComponent) {
+          // "perspective" restituisce il canvas WebGL con il background (piano con video) e l’overlay 3D
+          const canvas = screenshotComponent.getCanvas('perspective');
+          const dataURL = canvas.toDataURL("image/png");
+          const link = document.createElement("a");
+          link.download = "screenshot.png";
+          link.href = dataURL;
+          link.click();
+        } else {
+          console.warn("Il componente screenshot non è disponibile.");
+        }
+      }
+
+      // Funzioni per la registrazione video (se ti servono, altrimenti possono essere omesse)
+      let mediaRecorder;
+      let recordedChunks = [];
+      let isRecording = false;
+
+      function startRecording() {
+        recordedChunks = [];
+        const stream = scene.renderer.domElement.captureStream(30);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) recordedChunks.push(event.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'video.webm';
+          a.click();
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        recordingIndicator.style.display = 'block';
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && isRecording) {
+          mediaRecorder.stop();
+          isRecording = false;
+          recordingIndicator.style.display = 'none';
+        }
+      }
+
+      let pressTimer;
+      captureButton.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        pressTimer = setTimeout(() => {
+          startRecording();
+        }, 500);
+      });
+      captureButton.addEventListener('pointerup', (event) => {
+        event.preventDefault();
+        clearTimeout(pressTimer);
+        if (!isRecording) {
+          takeScreenshot();
+        } else {
+          stopRecording();
+        }
+      });
+      captureButton.addEventListener('pointerleave', (event) => {
+        event.preventDefault();
+        clearTimeout(pressTimer);
+        if (isRecording) {
+          stopRecording();
+        }
+      });
+    </script>
+  </body>
+</html>
