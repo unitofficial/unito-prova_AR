@@ -19,7 +19,7 @@
         width: 1px;
         height: 1px;
       }
-      /* Pulsante per lo screenshot/registrazione */
+      /* Pulsante per lo screenshot */
       #capture {
         position: absolute;
         bottom: 20px;
@@ -38,20 +38,6 @@
       }
       #capture:active {
         transform: translateX(-50%) scale(0.9);
-      }
-      /* Indicatore di registrazione */
-      #recordingIndicator {
-        position: absolute;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: rgba(255,0,0,0.8);
-        color: white;
-        padding: 10px;
-        font-size: 16px;
-        border-radius: 10px;
-        display: none;
-        z-index: 1001;
       }
     </style>
   </head>
@@ -88,12 +74,10 @@
       </a-entity>
     </a-scene>
 
-    <div id="recordingIndicator">Registrazione in corso...</div>
     <button id="capture"></button>
 
     <script>
       const captureButton = document.getElementById('capture');
-      const recordingIndicator = document.getElementById('recordingIndicator');
       const scene = document.querySelector('a-scene');
 
       // Al renderstart, assegniamo all'elemento video creato da MindAR l'id "videoFeed"
@@ -105,7 +89,7 @@
         }
       });
 
-      // Composite Screenshot: crea un'immagine usando le dimensioni attuali del dispositivo
+      // Composite Screenshot: crea un'immagine utilizzando le dimensioni attuali del dispositivo
       function compositeScreenshot() {
         const screenshotComponent = scene.components.screenshot;
         if (!screenshotComponent) {
@@ -140,73 +124,31 @@
           return;
         }
         
-        // Disegna l'overlay sopra il video, scalando alla dimensione del dispositivo.
-        // Potrebbe essere necessario regolare questo se il contenuto 3D non si allinea esattamente.
+        // Disegna l'overlay sopra il video, scalando alla dimensione della canvas
         ctx.drawImage(overlayCanvas, 0, 0, width, height);
         
-        // Esporta il risultato come immagine PNG e attiva il download
+        // Converte la canvas composita in un data URL PNG
         const dataURL = compositeCanvas.toDataURL("image/png");
+        
+        // Crea un link temporaneo per il download
         const link = document.createElement("a");
         link.download = "screenshot.png";
         link.href = dataURL;
-        link.click();
-      }
-
-      // Funzioni per la registrazione video (se necessarie)
-      let mediaRecorder;
-      let recordedChunks = [];
-      let isRecording = false;
-
-      function startRecording() {
-        recordedChunks = [];
-        const stream = scene.renderer.domElement.captureStream(30);
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) recordedChunks.push(event.data);
-        };
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'video.webm';
-          a.click();
-        };
-        mediaRecorder.start();
-        isRecording = true;
-        recordingIndicator.style.display = 'block';
-      }
-
-      function stopRecording() {
-        if (mediaRecorder && isRecording) {
-          mediaRecorder.stop();
-          isRecording = false;
-          recordingIndicator.style.display = 'none';
-        }
-      }
-
-      let pressTimer;
-      captureButton.addEventListener('pointerdown', (event) => {
-        event.preventDefault();
-        pressTimer = setTimeout(() => {
-          startRecording();
-        }, 500);
-      });
-      captureButton.addEventListener('pointerup', (event) => {
-        event.preventDefault();
-        clearTimeout(pressTimer);
-        if (!isRecording) {
-          compositeScreenshot();
+        
+        // Se il browser non supporta il download, apri in una nuova scheda
+        if (typeof link.download === "undefined") {
+          window.open(dataURL, '_blank');
         } else {
-          stopRecording();
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
-      });
-      captureButton.addEventListener('pointerleave', (event) => {
+      }
+
+      // Esegue la funzione di screenshot al click del bottone
+      captureButton.addEventListener('click', (event) => {
         event.preventDefault();
-        clearTimeout(pressTimer);
-        if (isRecording) {
-          stopRecording();
-        }
+        compositeScreenshot();
       });
     </script>
   </body>
