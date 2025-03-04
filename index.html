@@ -119,22 +119,44 @@
           });
         }
       });
-
-      // Funzione screenshot: usa il componente screenshot di A-Frame per catturare il canvas WebGL
+      
+            // Funzione screenshot: usa il componente screenshot di A-Frame per catturare il canvas WebGL
       function takeScreenshot() {
-        const screenshotComponent = scene.components.screenshot;
-        if (screenshotComponent) {
-          // "perspective" restituisce il canvas WebGL con il background (piano con video) e l’overlay 3D
-          const canvas = screenshotComponent.getCanvas('perspective');
-          const dataURL = canvas.toDataURL("image/png");
-          const link = document.createElement("a");
-          link.download = "screenshot.png";
-          link.href = dataURL;
-          link.click();
-        } else {
-          console.warn("Il componente screenshot non è disponibile.");
+        const video = document.querySelector('#videoFeed');
+        if (!video) {
+          console.warn("Video element not found.");
+          return;
         }
+        
+        // Temporarily set the video's opacity to fully visible so that its texture updates
+        const originalOpacity = video.style.opacity;
+        video.style.opacity = '1';
+        
+        // Also force the video texture to update on the video plane
+        const videoPlane = document.querySelector('#videoPlane');
+        if (videoPlane && videoPlane.getObject3D('mesh') && videoPlane.getObject3D('mesh').material.map) {
+          videoPlane.getObject3D('mesh').material.map.needsUpdate = true;
+        }
+        
+        // Allow a brief delay for the change to take effect
+        setTimeout(() => {
+          const screenshotComponent = scene.components.screenshot;
+          if (screenshotComponent) {
+            const canvas = screenshotComponent.getCanvas('perspective');
+            const dataURL = canvas.toDataURL("image/png");
+            const link = document.createElement("a");
+            link.download = "screenshot.png";
+            link.href = dataURL;
+            link.click();
+          } else {
+            console.warn("Il componente screenshot non è disponibile.");
+          }
+          
+          // Revert the video's opacity back to its original value
+          video.style.opacity = originalOpacity;
+        }, 100); // 100ms delay
       }
+      
 
       // Funzioni per la registrazione video (se ti servono, altrimenti possono essere omesse)
       let mediaRecorder;
