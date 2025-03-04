@@ -14,10 +14,12 @@
       /* Il video generato da MindAR NON deve essere hidden con display:none, altrimenti non aggiorna la texture.
          Lo riduciamo a dimensioni minime e lo rendiamo quasi invisibile. */
       a-scene video {
-        left: -99999px;
+        opacity: 0.001;
         position: absolute;
+        width: 1px;
+        height: 1px;
       }
-      /* Pulsante per lo screenshot */
+      /* Pulsante per lo screenshot/registrazione */
       #capture {
         position: absolute;
         bottom: 20px;
@@ -104,36 +106,56 @@
       scene.addEventListener('renderstart', () => {
         const video = document.querySelector('video');
         if (video) {
-          video.crossOrigin = "anonymous"; // avoid CORS issues
+          video.crossOrigin = "anonymous"; // per evitare problemi CORS
           video.id = 'videoFeed';
-      
-          // When the video is playing, force a texture update on the videoPlane.
-          video.addEventListener('play', () => {
-            const videoPlane = document.querySelector('#videoPlane');
-            if (videoPlane && videoPlane.object3D) {
-              const mesh = videoPlane.getObject3D('mesh');
-              if (mesh && mesh.material && mesh.material.map) {
-                mesh.material.map.needsUpdate = true;
-              }
-            }
-          });
         }
       });
 
-      // Funzione screenshot: usa il componente screenshot di A-Frame per catturare il canvas WebGL
-      function takeScreenshot() {
+      // Composite Screenshot:
+      // 1. Capture the overlay (WebGL canvas with transparent areas)
+      // 2. Draw the current video frame as the background
+      // 3. Composite them into an offscreen canvas and trigger download
+      function compositeScreenshot() {
+        // Retrieve the screenshot component from A-Frame
         const screenshotComponent = scene.components.screenshot;
-        if (screenshotComponent) {
-          // "perspective" restituisce il canvas WebGL con il background (piano con video) e l’overlay 3D
-          const canvas = screenshotComponent.getCanvas('perspective');
-          const dataURL = canvas.toDataURL("image/png");
-          const link = document.createElement("a");
-          link.download = "screenshot.png";
-          link.href = dataURL;
-          link.click();
-        } else {
+        if (!screenshotComponent) {
           console.warn("Il componente screenshot non è disponibile.");
+          return;
         }
+        
+        // Get the WebGL canvas with overlay (the 3D content with transparency)
+        const overlayCanvas = screenshotComponent.getCanvas('perspective');
+        const width = overlayCanvas.width;
+        const height = overlayCanvas.height;
+        
+        // Create an offscreen canvas for compositing
+        const compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = width;
+        compositeCanvas.height = height;
+        const ctx = compositeCanvas.getContext('2d');
+        
+        // Get the video element used as texture
+        const video = document.querySelector('#videoFeed');
+        if (!video) {
+          console.warn("Video element not found.");
+          return;
+        }
+        
+        // Draw the current video frame as the background.
+        // Adjust these values if your video and canvas aspect ratios differ.
+        ctx.drawImage(video, 0, 0, width, height);
+        
+        // Then, draw the overlay canvas (the 3D content) on top.
+        ctx.drawImage(overlayCanvas, 0, 0, width, height);
+        
+        // Convert the composite canvas to a data URL (PNG format)
+        const dataURL = compositeCanvas.toDataURL("image/png");
+        
+        // Create a temporary link element to trigger the download
+        const link = document.createElement("a");
+        link.download = "screenshot.png";
+        link.href = dataURL;
+        link.click();
       }
 
       // Funzioni per la registrazione video (se ti servono, altrimenti possono essere omesse)
@@ -169,6 +191,7 @@
         }
       }
 
+      // Gestione degli eventi del bottone di cattura
       let pressTimer;
       captureButton.addEventListener('pointerdown', (event) => {
         event.preventDefault();
@@ -180,7 +203,7 @@
         event.preventDefault();
         clearTimeout(pressTimer);
         if (!isRecording) {
-          takeScreenshot();
+          compositeScreenshot();
         } else {
           stopRecording();
         }
