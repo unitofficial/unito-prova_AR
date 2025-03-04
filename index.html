@@ -14,10 +14,8 @@
       /* Il video generato da MindAR NON deve essere hidden con display:none, altrimenti non aggiorna la texture.
          Lo riduciamo a dimensioni minime e lo rendiamo quasi invisibile. */
       a-scene video {
-        opacity: 0.001;
+        left: -99999px;
         position: absolute;
-        width: 1px;
-        height: 1px;
       }
       /* Pulsante per lo screenshot */
       #capture {
@@ -78,7 +76,7 @@
         Le dimensioni qui sono impostate per un aspect ratio 16:9; adatta se necessario.
       -->
       <a-plane id="videoPlane" position="0 0 -1" rotation="0 0 0"
-               width="16" height="9"
+               width="9" height="16"
                material="shader: flat; src: #videoFeed">
       </a-plane>
 
