@@ -104,8 +104,19 @@
       scene.addEventListener('renderstart', () => {
         const video = document.querySelector('video');
         if (video) {
-          video.crossOrigin = "anonymous"; // per evitare problemi CORS
+          video.crossOrigin = "anonymous"; // avoid CORS issues
           video.id = 'videoFeed';
+      
+          // When the video is playing, force a texture update on the videoPlane.
+          video.addEventListener('play', () => {
+            const videoPlane = document.querySelector('#videoPlane');
+            if (videoPlane && videoPlane.object3D) {
+              const mesh = videoPlane.getObject3D('mesh');
+              if (mesh && mesh.material && mesh.material.map) {
+                mesh.material.map.needsUpdate = true;
+              }
+            }
+          });
         }
       });
 
