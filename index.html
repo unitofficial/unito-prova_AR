@@ -11,8 +11,8 @@
         margin: 0;
         overflow: hidden;
       }
-      /* Il video generato da MindAR NON deve essere hidden con display:none, altrimenti non aggiorna la texture.
-         Lo riduciamo a dimensioni minime e lo rendiamo quasi invisibile. */
+      /* Il video generato da MindAR NON deve essere hidden con display:none,
+         altrimenti non aggiorna la texture. Lo riduciamo a dimensioni minime e lo rendiamo quasi invisibile. */
       a-scene video {
         opacity: 0.001;
         position: absolute;
@@ -39,7 +39,7 @@
       #capture:active {
         transform: translateX(-50%) scale(0.9);
       }
-      /* Indicatore di registrazione (se usi anche la registrazione video) */
+      /* Indicatore di registrazione */
       #recordingIndicator {
         position: absolute;
         top: 20px;
@@ -72,18 +72,13 @@
       <a-light type="ambient" intensity="1"></a-light>
       <a-camera id="camera" position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- 
-        Piano di background che copre l’area visibile. 
-        Usando il video come texture (id "videoFeed") integriamo il feed della camera nel canvas.
-        Le dimensioni qui sono impostate per un aspect ratio 16:9; adatta se necessario.
-      -->
+      <!-- Piano di background: utilizziamo il video come texture -->
       <a-plane id="videoPlane" position="0 0 -1" rotation="0 0 0"
                width="9" height="16"
                material="shader: flat; src: #videoFeed">
       </a-plane>
 
-      <!-- Overlay 3D: l’asset (le ali) collegato a uno dei target.
-           Se hai più target, aggiungi le relative entità come nel tuo codice originale. -->
+      <!-- Overlay 3D: asset collegato a un target -->
       <a-entity mindar-image-target="targetIndex: 0">
         <a-gltf-model src="#avatarModel" 
                       position="0 0.4 0.1" 
@@ -91,7 +86,6 @@
                       rotation="0 180 0">
         </a-gltf-model>
       </a-entity>
-      <!-- Altri target (1-11) se necessario... -->
     </a-scene>
 
     <div id="recordingIndicator">Registrazione in corso...</div>
@@ -102,7 +96,7 @@
       const recordingIndicator = document.getElementById('recordingIndicator');
       const scene = document.querySelector('a-scene');
 
-      // Al renderstart, cerchiamo il video creato da MindAR e assegniamogli l'id "videoFeed"
+      // Al renderstart, assegniamo all'elemento video creato da MindAR l'id "videoFeed"
       scene.addEventListener('renderstart', () => {
         const video = document.querySelector('video');
         if (video) {
@@ -111,54 +105,54 @@
         }
       });
 
-      // Composite Screenshot:
-      // 1. Capture the overlay (WebGL canvas with transparent areas)
-      // 2. Draw the current video frame as the background
-      // 3. Composite them into an offscreen canvas and trigger download
+      // Composite Screenshot: crea un'immagine usando le dimensioni attuali del dispositivo
       function compositeScreenshot() {
-        // Retrieve the screenshot component from A-Frame
         const screenshotComponent = scene.components.screenshot;
         if (!screenshotComponent) {
           console.warn("Il componente screenshot non è disponibile.");
           return;
         }
         
-        // Get the WebGL canvas with overlay (the 3D content with transparency)
-        const overlayCanvas = screenshotComponent.getCanvas('perspective');
-        const width = overlayCanvas.width;
-        const height = overlayCanvas.height;
+        // Usa le dimensioni attuali del dispositivo (phone frame)
+        const width = window.innerWidth;
+        const height = window.innerHeight;
         
-        // Create an offscreen canvas for compositing
+        // Crea una canvas offscreen con le dimensioni del dispositivo
         const compositeCanvas = document.createElement('canvas');
         compositeCanvas.width = width;
         compositeCanvas.height = height;
         const ctx = compositeCanvas.getContext('2d');
         
-        // Get the video element used as texture
+        // Prendi l'elemento video usato come background
         const video = document.querySelector('#videoFeed');
         if (!video) {
           console.warn("Video element not found.");
           return;
         }
         
-        // Draw the current video frame as the background.
-        // Adjust these values if your video and canvas aspect ratios differ.
+        // Disegna il frame corrente del video sul canvas composite, scalato alle dimensioni complete
         ctx.drawImage(video, 0, 0, width, height);
         
-        // Then, draw the overlay canvas (the 3D content) on top.
+        // Prendi la canvas dell'overlay (contenente il contenuto 3D)
+        const overlayCanvas = screenshotComponent.getCanvas('perspective');
+        if (!overlayCanvas) {
+          console.warn("Overlay canvas not available.");
+          return;
+        }
+        
+        // Disegna l'overlay sopra il video, scalando alla dimensione del dispositivo.
+        // Potrebbe essere necessario regolare questo se il contenuto 3D non si allinea esattamente.
         ctx.drawImage(overlayCanvas, 0, 0, width, height);
         
-        // Convert the composite canvas to a data URL (PNG format)
+        // Esporta il risultato come immagine PNG e attiva il download
         const dataURL = compositeCanvas.toDataURL("image/png");
-        
-        // Create a temporary link element to trigger the download
         const link = document.createElement("a");
         link.download = "screenshot.png";
         link.href = dataURL;
         link.click();
       }
 
-      // Funzioni per la registrazione video (se ti servono, altrimenti possono essere omesse)
+      // Funzioni per la registrazione video (se necessarie)
       let mediaRecorder;
       let recordedChunks = [];
       let isRecording = false;
@@ -191,7 +185,6 @@
         }
       }
 
-      // Gestione degli eventi del bottone di cattura
       let pressTimer;
       captureButton.addEventListener('pointerdown', (event) => {
         event.preventDefault();
